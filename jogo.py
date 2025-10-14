@@ -3,6 +3,7 @@ from configs import *
 from cartas import Deck
 from player import Player, Dealer
 from botao import Button
+from bank import Bank
 
 class Game:
     def __init__(self, screen):
@@ -14,6 +15,14 @@ class Game:
         self.big_font = pygame.font.SysFont(None, 32)
         self.state = 'idle'
         self.message = 'Click DEAL to start'
+        self.bank = Bank()
+        self.bet_options = [10, 50, 100, 200, 500]
+        self.selected_bet = 50
+        self.bet_buttons = [
+            Button((400 + i*100, SCREEN_HEIGHT - 60, 80, 40), f"${amt}", self.font)
+            for i, amt in enumerate(self.bet_options)
+        ]
+
 
         # Botões
         self.btn_deal = Button((20, SCREEN_HEIGHT - 60, 100, 40), 'DEAL', self.font)
@@ -23,18 +32,30 @@ class Game:
 
     # ----- Lógica de jogo -----
     def start_round(self):
+        if self.bank.is_broke():
+            self.state = 'game_over'
+            self.message = 'Você ficou sem dinheiro! Fim de jogo.'
+            return
+
+        if not self.bank.place_bet(self.selected_bet):
+            self.message = 'Saldo insuficiente para essa aposta.'
+            return
+
         self.player.hand.clear()
         self.dealer.hand.clear()
         for _ in range(2):
             self.player.hand.add(self.deck.draw())
             self.dealer.hand.add(self.deck.draw())
         self.state = 'playing'
-        self.message = 'Your move: HIT or STAND'
+        self.message = f'Aposta: ${self.selected_bet} | Saldo: ${self.bank.balance}'
+
         if self.player.hand.is_blackjack():
             if self.dealer.hand.is_blackjack():
-                self.message = 'Push: both have Blackjack'
+                self.bank.push()
+                self.message = 'Push: ambos Blackjack!'
             else:
-                self.message = 'Blackjack! You win!'
+                self.bank.win()
+                self.message = 'Blackjack! Você ganhou!'
             self.state = 'round_over'
 
     def player_hit(self):
@@ -56,19 +77,25 @@ class Game:
 
     def resolve_round(self):
         if self.dealer.hand.is_bust():
-            self.message = 'Dealer busted — you win!'
+            self.bank.win()
+            self.message = f'Dealer estourou! Você ganhou ${self.selected_bet}'
         else:
             p_val = self.player.hand.best_value()
             d_val = self.dealer.hand.best_value()
             if p_val > 21:
-                self.message = 'You busted — dealer wins.'
+                self.bank.lose()
+                self.message = f'Você estourou — perdeu ${self.selected_bet}'
             elif p_val > d_val:
-                self.message = f'You win! {p_val} vs {d_val}'
+                self.bank.win()
+                self.message = f'Você ganhou ${self.selected_bet}!'
             elif p_val < d_val:
-                self.message = f'Dealer wins: {d_val} vs {p_val}'
+                self.bank.lose()
+                self.message = f'Dealer ganhou — perdeu ${self.selected_bet}'
             else:
-                self.message = f'Push: {p_val}'
+                self.bank.push()
+                self.message = f'Empate — aposta devolvida.'
         self.state = 'round_over'
+
 
     # ----- Renderização -----
     def draw_card(self, surf, card, pos):
@@ -117,6 +144,11 @@ class Game:
         for btn in [self.btn_deal, self.btn_hit, self.btn_stand, self.btn_quit]:
             btn.draw(surf, mouse_pos)
 
+        # Saldo e aposta atual
+        info_text = f"Saldo: ${self.bank.balance} | Aposta: ${self.selected_bet}"
+        surf.blit(self.big_font.render(info_text, True, (255,255,255)), (20, SCREEN_HEIGHT - 160))
+
+
     def handle_event(self, event):
         if self.btn_quit.clicked(event):
             pygame.quit(); sys.exit()
@@ -126,3 +158,10 @@ class Game:
             self.player_hit()
         if self.btn_stand.clicked(event):
             self.player_stand()
+            # Escolher aposta
+        if self.state in ('idle', 'round_over'):
+            for btn, amt in zip(self.bet_buttons, self.bet_options):
+                if btn.clicked(event):
+                    self.selected_bet = amt
+                    self.message = f"Aposta selecionada: ${amt}"
+
