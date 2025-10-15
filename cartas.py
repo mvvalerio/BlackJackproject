@@ -1,10 +1,11 @@
 import random
-from configs import RANKS, SUITS, VALUES
+from configs import RANKS, SUITS, VALUES, SUIT_SYMBOLS
 
 class Card:
     def __init__(self, rank, suit):
         self.rank = rank
         self.suit = suit
+        self.suit_symbol = SUIT_SYMBOLS[suit]
 
     def value(self):
         return VALUES[self.rank]

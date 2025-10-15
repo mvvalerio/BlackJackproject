@@ -101,13 +101,34 @@ class Game:
     def draw_card(self, surf, card, pos):
         x, y = pos
         rect = pygame.Rect(x, y, CARD_WIDTH, CARD_HEIGHT)
+        
+        # fundo da carta
         pygame.draw.rect(surf, CARD_COLOR, rect, border_radius=8)
         pygame.draw.rect(surf, CARD_BORDER, rect, 2, border_radius=8)
-        suit_color = (200, 0, 0) if card.suit in ('♥', '♦') else TEXT_COLOR
-        surf.blit(self.font.render(card.rank, True, suit_color), (x+6, y+6))
-        surf.blit(self.font.render(card.suit, True, suit_color), (x+6, y+26))
-        big = self.big_font.render(f'{card.rank}{card.suit}', True, suit_color)
-        surf.blit(big, big.get_rect(center=rect.center))
+
+        # cor depende do naipe
+        suit_color = (200, 0, 0) if card.suit in ('heart', 'diamond') else TEXT_COLOR
+
+        # rank pequeno no canto superior esquerdo
+        rank_text = self.font.render(card.rank, True, suit_color)
+        surf.blit(rank_text, (x + 8, y + 6))
+
+        # rank pequeno no canto inferior direito (espelhado)
+        rank_text_rot = pygame.transform.rotate(rank_text, 180)
+        surf.blit(rank_text_rot, (x + CARD_WIDTH - rank_text.get_width() - 8, 
+                                y + CARD_HEIGHT - rank_text.get_height() - 6))
+
+        # imagem do naipe centralizada
+        suit_img = SUITS.get(card.suit)
+        if suit_img:
+            img_rect = suit_img.get_rect(center=rect.center)
+            surf.blit(suit_img, img_rect)
+        else:
+            # fallback se imagem faltar
+            suit_symbol = SUIT_SYMBOLS.get(card.suit, '?')
+            big = self.big_font.render(suit_symbol, True, suit_color)
+            surf.blit(big, big.get_rect(center=rect.center))
+
 
     def draw_back_card(self, surf, pos):
         x, y = pos
@@ -164,4 +185,3 @@ class Game:
                 if btn.clicked(event):
                     self.selected_bet = amt
                     self.message = f"Aposta selecionada: ${amt}"
-
