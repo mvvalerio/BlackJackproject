@@ -1,6 +1,4 @@
-import pygame, sys
-from Configs import *
-from Jogo import *
+
 
 def main():
     
