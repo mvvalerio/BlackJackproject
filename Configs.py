@@ -18,6 +18,7 @@ BUTTON_HIGHLIGHT = (170, 170, 170)
 
 # --------- Baralho ---------
 RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
-SUITS = ['S', 'H', 'D', 'C']
+SUITS = [pygame.image.load("https://upload.wikimedia.org/wikipedia/commons/e/e7/Spades.svg"), pygame.image.load("https://freesvg.org/img/jean_victor_balin_card_coeur.png"), pygame.image.load("https://upload.wikimedia.org/wikipedia/en/thumb/1/1f/Card_diamond.svg/1486px-Card_diamond.svg.png"), pygame.image.load("https://upload.wikimedia.org/wikipedia/en/thumb/0/0a/Card_club.svg/1954px-Card_club.svg.png")]
+SUITS = pygame.transform.scale(SUITS, 50, 50)
 VALUES = {'A':1, '2':2, '3':3, '4':4, '5':5, '6':6, '7':7,
           '8':8, '9':9, '10':10, 'J':10, 'Q':10, 'K':10}
