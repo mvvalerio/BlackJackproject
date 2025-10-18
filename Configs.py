@@ -1,4 +1,10 @@
 import pygame
+import os
+
+# --------- Diretorio de Imagens ---------
+
+BASE_DIR = os.path.dirname(__file__)
+IMG_DIR = os.path.join(BASE_DIR, "png-cards")
 
 # --------- Constantes gerais ---------
 SCREEN_WIDTH = 900
