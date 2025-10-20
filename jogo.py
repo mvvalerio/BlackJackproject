@@ -139,38 +139,95 @@ class Game:
                   self.big_font.render('🂠', True, (255,255,255)).get_rect(center=rect.center))
 
     def render(self):
-        surf = self.screen
-        surf.fill(TABLE_COLOR)
-        mouse_pos = pygame.mouse.get_pos()
+        # render em um tamanho fixo
+        base_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        base_surface.fill(TABLE_COLOR)
+
+        # computar a escala e o offset
+        window_width, window_height = self.screen.get_size()
+        aspect_base = SCREEN_WIDTH / SCREEN_HEIGHT
+        aspect_window = window_width / window_height
+
+        if aspect_window > aspect_base:
+            new_height = window_height
+            new_width = int(new_height * aspect_base)
+        else:
+            new_width = window_width
+            new_height = int(new_width / aspect_base)
+
+        x_center = (window_width - new_width) // 2
+        y_center = (window_height - new_height) // 2
+
+        # converte a posicao do mouse para as coordenadas base
+        mx, my = pygame.mouse.get_pos()
+        # na area escalada
+        if x_center <= mx <= x_center + new_width and y_center <= my <= y_center + new_height:
+            # voltar a escala
+            scale_x = SCREEN_WIDTH / new_width
+            scale_y = SCREEN_HEIGHT / new_height
+            base_mouse = ((mx - x_center) * scale_x, (my - y_center) * scale_y)
+        else:
+            base_mouse = (-1, -1)  # fora da area
 
         # Dealer
-        surf.blit(self.big_font.render('Dealer', True, (255,255,255)), (20,20))
+        base_surface.blit(self.big_font.render('Dealer', True, (255,255,255)), (20, 20))
         for i, c in enumerate(self.dealer.hand.cards):
             x = 20 + i * (CARD_WIDTH + CARD_GAP)
             if i == 0 and self.state == 'playing':
-                self.draw_back_card(surf, (x, 60))
+                self.draw_back_card(base_surface, (x, 60))
             else:
-                self.draw_card(surf, c, (x, 60))
+                self.draw_card(base_surface, c, (x, 60))
 
         # Player
-        surf.blit(self.big_font.render('Player', True, (255,255,255)), (20,240))
+        base_surface.blit(self.big_font.render('Player', True, (255,255,255)), (20, 240))
         for i, c in enumerate(self.player.hand.cards):
-            self.draw_card(surf, c, (20 + i*(CARD_WIDTH+CARD_GAP), 280))
+            self.draw_card(base_surface, c, (20 + i*(CARD_WIDTH+CARD_GAP), 280))
 
-        # Mensagem
+        # mensagem
         msg_surf = self.big_font.render(self.message, True, (255,255,0))
-        surf.blit(msg_surf, (SCREEN_WIDTH//2 - msg_surf.get_width()//2, SCREEN_HEIGHT - 120))
+        base_surface.blit(msg_surf, (SCREEN_WIDTH//2 - msg_surf.get_width()//2, SCREEN_HEIGHT - 120))
 
-        # Botões
+        # butoes
         for btn in [self.btn_deal, self.btn_hit, self.btn_stand, self.btn_quit]:
-            btn.draw(surf, mouse_pos)
+            btn.draw(base_surface, base_mouse)
 
-        # Saldo e aposta atual
+        # informacao de saldo
         info_text = f"Saldo: ${self.bank.balance} | Aposta: ${self.selected_bet}"
-        surf.blit(self.big_font.render(info_text, True, (255,255,255)), (20, SCREEN_HEIGHT - 160))
+        base_surface.blit(self.big_font.render(info_text, True, (255,255,255)), (20, SCREEN_HEIGHT - 160))
+
+        # escala para a tela principal
+        scaled_surface = pygame.transform.smoothscale(base_surface, (new_width, new_height))
+        self.screen.fill((0, 0, 0))
+        self.screen.blit(scaled_surface, (x_center, y_center))
 
 
     def handle_event(self, event):
+        # ajustar o mouse para a tela escalada
+        window_width, window_height = self.screen.get_size()
+        aspect_base = SCREEN_WIDTH / SCREEN_HEIGHT
+        aspect_window = window_width / window_height
+
+        if aspect_window > aspect_base:
+            new_height = window_height
+            new_width = int(new_height * aspect_base)
+        else:
+            new_width = window_width
+            new_height = int(new_width / aspect_base)
+
+        x_center = (window_width - new_width) // 2
+        y_center = (window_height - new_height) // 2
+
+        # evento de reescalar a posicao do mouse
+        if event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP, pygame.MOUSEMOTION):
+            mx, my = event.pos
+            if x_center <= mx <= x_center + new_width and y_center <= my <= y_center + new_height:
+                scale_x = SCREEN_WIDTH / new_width
+                scale_y = SCREEN_HEIGHT / new_height
+                event.pos = ((mx - x_center) * scale_x, (my - y_center) * scale_y)
+            else:
+                return
+
+        # cliques normalmente em coordenadas de base
         if self.btn_quit.clicked(event):
             pygame.quit(); sys.exit()
         if self.btn_deal.clicked(event):
@@ -179,7 +236,7 @@ class Game:
             self.player_hit()
         if self.btn_stand.clicked(event):
             self.player_stand()
-            # Escolher aposta
+
         if self.state in ('idle', 'round_over'):
             for btn, amt in zip(self.bet_buttons, self.bet_options):
                 if btn.clicked(event):
