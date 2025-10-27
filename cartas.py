@@ -1,17 +1,16 @@
 import random
-from configs import RANKS, SUITS, VALUES, SUIT_SYMBOLS
+from configs import RANKS, SUITS, VALUES
 
 class Card:
     def __init__(self, rank, suit):
         self.rank = rank
         self.suit = suit
-        self.suit_symbol = SUIT_SYMBOLS[suit]
 
     def value(self):
         return VALUES[self.rank]
 
     def is_ace(self):
-        return self.rank == 'A'
+        return self.rank == 'ace'
 
     def __repr__(self):
         return f"{self.rank}{self.suit}"
@@ -45,7 +44,9 @@ class Hand:
         aces = sum(1 for card in self.cards if card.is_ace())
         totals = {total}
         for _ in range(aces):
-            new_totals = {t + 10 for t in totals}
+            new_totals = set()
+            for t in totals:
+                new_totals.add(t + 10)
             totals |= new_totals
         return sorted([t for t in totals if t <= 21], reverse=True) or [min(totals)]
 
