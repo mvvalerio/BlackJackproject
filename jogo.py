@@ -353,7 +353,7 @@ class Game:
 
         # Message
         msg_surf = self.font.render(self.message, True, (255, 255, 0))
-        surf.blit(msg_surf, (self.base_width // 2 - msg_surf.get_width() // 2, self.base_height - 90))
+        surf.blit(msg_surf, (self.base_width // 2 - msg_surf.get_width() // 2, self.base_height - 370))
 
         # Draw Bank
         self.bank.draw(surf, (self.base_width - 220, 70))
