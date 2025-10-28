@@ -1,7 +1,10 @@
 import pygame
+import json
+import os
 
 class Bank:
-    def __init__(self, initial_amount=1000, font=None):
+    def __init__(self, initial_amount=1000, font=None, save_file="bank.json"):
+        self.save_file = save_file
         self.amount = initial_amount
         self.bet = 10
         self.min_bet = 1
@@ -10,6 +13,32 @@ class Bank:
         self.slider_handle_rect = pygame.Rect(0, 0, 20, 20)
         self.dragging = False
         self.font = font or pygame.font.SysFont("serif", 20, bold=True)
+
+        # Load saved data (if available)
+        self.load_from_json()
+
+    def save_to_json(self):
+        """Automatically saves the current bank data to a JSON file."""
+        data = {
+            "amount": self.amount,
+            "bet": self.bet,
+            "min_bet": self.min_bet
+        }
+        with open(self.save_file, "w") as f:
+            json.dump(data, f, indent=4)
+
+    def load_from_json(self):
+        """Loads bank data from JSON file if it exists."""
+        if os.path.exists(self.save_file):
+            try:
+                with open(self.save_file, "r") as f:
+                    data = json.load(f)
+                    self.amount = data.get("amount", self.amount)
+                    self.bet = data.get("bet", self.bet)
+                    self.min_bet = data.get("min_bet", self.min_bet)
+                    self.max_bet = self.amount
+            except json.JSONDecodeError:
+                print("Warning: bank.json is corrupted. Using default values.")
 
     def draw(self, screen, position):
         # Always keep max_bet synced with current bank amount
@@ -58,10 +87,14 @@ class Bank:
                 )
 
     def place_bet(self):
+        """Subtracts the current bet from the bank and auto-saves."""
         if self.bet > self.amount:
             return False  # cannot bet more than available
         self.amount -= self.bet
+        self.save_to_json()  # auto-save after betting
         return True
 
     def payout(self, multiplier=2):
+        """Adds winnings to the bank and auto-saves."""
         self.amount += int(self.bet * multiplier)
+        self.save_to_json()  # auto-save after payout
