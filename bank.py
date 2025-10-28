@@ -5,7 +5,7 @@ class Bank:
         self.amount = initial_amount
         self.bet = 10
         self.min_bet = 1
-        self.max_bet = self.amount
+        self.max_bet = 500
         self.slider_rect = pygame.Rect(0, 0, 200, 10)
         self.slider_handle_rect = pygame.Rect(0, 0, 20, 20)
         self.dragging = False
