@@ -7,7 +7,7 @@ from bank import Bank
 
 class Game:
     def __init__(self, screen):
-        self.card_images = self.load_card_images("png-cards")
+        self.card_images = self.load_card_images("imgs")
         self.screen = screen
         self.deck = Deck(num_decks=4)
         self.player = Player()
@@ -18,6 +18,7 @@ class Game:
         self.message = 'Click DEAL to start'
 
         self.fullscreen = False
+        self.player_doubled = [False for _ in self.player.hands]
         self.base_width = SCREEN_WIDTH
         self.base_height = SCREEN_HEIGHT
         self.base_surface = pygame.Surface((self.base_width, self.base_height))
@@ -27,6 +28,7 @@ class Game:
         self.btn_hit = Button((140, self.base_height - 60, 100, 40), 'HIT', self.font)
         self.btn_stand = Button((260, self.base_height - 60, 100, 40), 'STAND', self.font)
         self.btn_split = Button((380, self.base_height - 60, 100, 40), 'SPLIT', self.font)
+        self.btn_double = Button((500, self.base_height - 60, 120, 40), 'DOUBLE', self.font)
         self.btn_quit = Button((self.base_width - 120, self.base_height - 60, 100, 40), 'QUIT', self.font)
 
         # Bank
@@ -40,30 +42,48 @@ class Game:
 
         self.player.reset()
         self.dealer.reset()
-        # Initial 2 cards
+
+        # Deal initial cards
         self.player.add_card(self.deck.draw())
         self.dealer.add_card(self.deck.draw())
         self.player.add_card(self.deck.draw())
         self.dealer.add_card(self.deck.draw())
+
+        # Update state
         self.state = 'playing'
         self.message = ''
         self.btn_deal.enabled = False
-        self.btn_split.enabled = self.player.can_split()
+
+        # Enable player actions
         self.btn_hit.enabled = True
         self.btn_stand.enabled = True
+        self.btn_split.enabled = self.player.can_split()
+        self.btn_double.enabled = True   # make sure it's visible now
 
-        # Check Blackjack
-        if self.player.hands[0].is_blackjack():
-            if self.dealer.hands[0].is_blackjack():
+        # Reset double tracking
+        self.player_doubled = [False for _ in self.player.hands]
+
+        # Check for Blackjack
+        player_blackjack = self.player.hands[0].is_blackjack()
+        dealer_blackjack = self.dealer.hands[0].is_blackjack()
+
+        if player_blackjack or dealer_blackjack:
+            if player_blackjack and dealer_blackjack:
                 self.message = 'Push: both have Blackjack'
-            else:
+            elif player_blackjack:
                 self.message = 'Blackjack! You win!'
-                self.bank.payout(2.5)  # blackjack pays 3:2
+                self.bank.payout(2.5)
+            else:
+                self.message = 'Dealer has Blackjack! You lose.'
+
+            # End round immediately if Blackjack occurs
             self.state = 'round_over'
             self.btn_deal.enabled = True
             self.btn_hit.enabled = False
             self.btn_stand.enabled = False
             self.btn_split.enabled = False
+            self.btn_double.enabled = False  # ✅ only disable here (not always)
+
 
     def player_hit(self):
         if self.state != 'playing':
@@ -116,6 +136,59 @@ class Game:
             # continua jogando na primeira mão
         else:
             self.message = 'Cannot split these cards.'
+
+    def player_double(self):
+        if self.state != 'playing':
+            return
+
+        hand_index = self.player.current_hand
+        hand = self.player.hands[hand_index]
+
+        # Only allow double once per hand
+        if self.player_doubled[hand_index]:
+            self.message = "You already doubled this hand!"
+            return
+
+        # Only allowed with exactly two cards
+        if len(hand.cards) != 2:
+            self.message = "You can only double on your first two cards!"
+            return
+
+        # Check for enough money
+        if self.bank.bet > self.bank.amount:
+            self.message = "Not enough money to double!"
+            return
+
+        # Deduct additional bet
+        self.bank.place_bet()
+        self.bank.bet *= 2
+        self.player_doubled[hand_index] = True
+
+        # Add one card
+        hand.add(self.deck.draw())
+
+        # Move to next hand or dealer
+        if hand.is_bust():
+            self.message = f"Hand {hand_index + 1} busted after double!"
+        else:
+            self.message = f"Hand {hand_index + 1} doubled down."
+
+        # If more hands remain, move to the next one
+        if hand_index + 1 < len(self.player.hands):
+            self.player.current_hand += 1
+            self.message += f" Playing hand {self.player.current_hand + 1}."
+            self.btn_split.enabled = False
+            self.btn_double.enabled = True
+            self.btn_hit.enabled = True
+            self.btn_stand.enabled = True
+        else:
+            # All hands done, dealer plays
+            self.btn_hit.enabled = False
+            self.btn_stand.enabled = False
+            self.btn_split.enabled = False
+            self.btn_double.enabled = False
+            self.state = 'player_stand'
+            self.dealer_play()
 
     def dealer_play(self):
         while not self.dealer.hands[0].is_bust() and self.dealer.should_hit():
@@ -274,8 +347,8 @@ class Game:
             surf.blit(self.font.render(val_text, True, color), (hand_x, base_y + CARD_HEIGHT + 5))
 
             # Highlight current hand
-            if idx == self.player.current_hand:
-                pygame.draw.rect(surf, (255, 255, 0),
+            if len(self.player.hands) > 1 and idx == self.player.current_hand:
+                pygame.draw.rect(surf, (255, 255, 255),
                                 (hand_x - 5, base_y - 5, (CARD_WIDTH + CARD_GAP) * len(hand.cards), CARD_HEIGHT + 10), 3)
 
         # Message
@@ -309,6 +382,7 @@ class Game:
         self.btn_hit.draw(surf, mouse_pos)
         self.btn_stand.draw(surf, mouse_pos)
         self.btn_split.draw(surf, mouse_pos)
+        self.btn_double.draw(surf, mouse_pos)
         self.btn_quit.draw(surf, mouse_pos)
 
         # Blit scaled surface to screen
@@ -362,6 +436,8 @@ class Game:
                         self.player_stand()
                     elif self.btn_split.clicked(temp_event):
                         self.player_split()
+                    elif self.btn_double.clicked(temp_event):
+                        self.player_double()
                     elif self.btn_quit.clicked(temp_event):
                         pygame.quit()
                         sys.exit()
