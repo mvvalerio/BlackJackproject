@@ -130,13 +130,16 @@ class Bank:
         self.amount = initial_amount
         self.bet = 10
         self.min_bet = 1
-        self.max_bet = self.amount
+        self.max_bet = self.amount  # max bet starts equal to bank
         self.slider_rect = pygame.Rect(0, 0, 200, 10)
         self.slider_handle_rect = pygame.Rect(0, 0, 20, 20)
         self.dragging = False
         self.font = font or pygame.font.SysFont("serif", 20, bold=True)
 
     def draw(self, screen, position):
+        # Always keep max_bet synced with current bank amount
+        self.max_bet = max(self.min_bet, self.amount)
+
         x, y = position
         # Display bank amount
         amt_text = self.font.render(f"Bank: ${self.amount}", True, (255, 255, 255))
@@ -144,13 +147,20 @@ class Bank:
 
         # Slider position
         self.slider_rect.topleft = (x, y + 30)
-        pygame.draw.rect(screen, (180, 180, 180), self.slider_rect)  # slider bar
+        pygame.draw.rect(screen, (180, 180, 180), self.slider_rect)
+
+        # Clamp bet to current max_bet if needed
+        self.bet = min(self.bet, self.max_bet)
 
         # Handle position based on bet
-        handle_x = x + int((self.bet - self.min_bet) / (self.max_bet - self.min_bet) * (self.slider_rect.width - self.slider_handle_rect.width))
+        handle_x = x + int(
+            (self.bet - self.min_bet)
+            / (self.max_bet - self.min_bet)
+            * (self.slider_rect.width - self.slider_handle_rect.width)
+        ) if self.max_bet > self.min_bet else x
         handle_y = y + 25
         self.slider_handle_rect.topleft = (handle_x, handle_y)
-        pygame.draw.rect(screen, (255, 255, 0), self.slider_handle_rect)  # handle
+        pygame.draw.rect(screen, (255, 255, 0), self.slider_handle_rect)
 
         # Display current bet
         bet_text = self.font.render(f"Bet: ${self.bet}", True, (255, 255, 255))
@@ -164,11 +174,13 @@ class Bank:
             self.dragging = False
         elif event.type == pygame.MOUSEMOTION:
             if self.dragging:
-                # Update handle position
+                self.max_bet = max(self.min_bet, self.amount)
                 rel_x = event.pos[0] - self.slider_rect.x
                 rel_x = max(0, min(rel_x, self.slider_rect.width - self.slider_handle_rect.width))
-                # Map to bet amount
-                self.bet = self.min_bet + int(rel_x / (self.slider_rect.width - self.slider_handle_rect.width) * (self.max_bet - self.min_bet))
+                self.bet = self.min_bet + int(
+                    rel_x / (self.slider_rect.width - self.slider_handle_rect.width)
+                    * (self.max_bet - self.min_bet)
+                )
 
     def place_bet(self):
         if self.bet > self.amount:
