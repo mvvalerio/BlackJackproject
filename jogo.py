@@ -58,7 +58,7 @@ class Game:
         self.btn_hit.enabled = True
         self.btn_stand.enabled = True
         self.btn_split.enabled = self.player.can_split()
-        self.btn_double.enabled = True   # make sure it's visible now
+        self.btn_double.enabled = True   # ✅ make sure it's visible now
 
         # Reset double tracking
         self.player_doubled = [False for _ in self.player.hands]
@@ -353,7 +353,7 @@ class Game:
 
         # Message
         msg_surf = self.font.render(self.message, True, (255, 255, 0))
-        surf.blit(msg_surf, (self.base_width // 2 - msg_surf.get_width() // 2, self.base_height - 370))
+        surf.blit(msg_surf, (self.base_width // 2 - msg_surf.get_width() // 2, self.base_height - 370 ))
 
         # Draw Bank
         self.bank.draw(surf, (self.base_width - 220, 70))
