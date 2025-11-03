@@ -402,9 +402,13 @@ class Game:
                 pygame.quit()
                 sys.exit()
 
+            # Toggle fullscreen
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_F11:
                     self.toggle_fullscreen()
+
+                # Pass keyboard events to bank for typing
+                self.bank.handle_event(event)
 
             elif event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP, pygame.MOUSEMOTION):
                 # Scale mouse coordinates for fullscreen
@@ -422,11 +426,11 @@ class Game:
                 else:
                     scaled_mouse = (mx, my)
 
-                # Pass event with scaled position to Bank
+                # Pass mouse events to bank
                 temp_event = pygame.event.Event(event.type, {**event.dict, "pos": scaled_mouse})
                 self.bank.handle_event(temp_event)
 
-                # Only handle clicks on MOUSEBUTTONDOWN
+                # Handle your buttons
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     if self.btn_deal.clicked(temp_event):
                         self.start_round()
