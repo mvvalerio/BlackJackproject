@@ -4,9 +4,14 @@ from cartas import Deck, Hand
 from player import Player, Dealer
 from botao import Button
 from bank import Bank
+from cardSprite import CardSprite
 
 class Game:
     def __init__(self, screen):
+        self.base_width = SCREEN_WIDTH
+        self.base_height = SCREEN_HEIGHT
+        self.base_surface = pygame.Surface((self.base_width, self.base_height))
+        self.deck_pos = (self.base_width // 2 - CARD_WIDTH // 2, 50)
         self.card_images = self.load_card_images("imgs")
         self.screen = screen
         self.deck = Deck(num_decks=4)
@@ -16,12 +21,11 @@ class Game:
         self.big_font = pygame.font.SysFont("serif", 36, bold=True)
         self.state = 'idle'
         self.message = 'Click DEAL to start'
+        self.animated_cards = []  # store CardSprite instances
+        self.deck_pos = (self.base_width // 2 - CARD_WIDTH // 2, 50)  # center deck position
 
         self.fullscreen = False
         self.player_doubled = [False for _ in self.player.hands]
-        self.base_width = SCREEN_WIDTH
-        self.base_height = SCREEN_HEIGHT
-        self.base_surface = pygame.Surface((self.base_width, self.base_height))
 
         # UI Buttons
         self.btn_deal = Button((20, self.base_height - 60, 100, 40), 'DEAL', self.font)
@@ -34,6 +38,24 @@ class Game:
         # Bank
         self.bank = Bank(initial_amount=1000, font=self.font)
 
+    def animate_card_to_player(self, card, hand_index, card_index):
+        hand_x = 50 + hand_index * (CARD_WIDTH + CARD_GAP) * 5
+        base_y = self.base_height - CARD_HEIGHT - 120
+        target_pos = (hand_x + card_index * (CARD_WIDTH + CARD_GAP), base_y)
+        img = self.card_images.get((card.rank, card.suit), None)
+        if img:
+            sprite = CardSprite(img, self.deck_pos, target_pos, speed=15)
+            self.animated_cards.append(sprite)
+
+    def animate_card_to_dealer(self, card, card_index):
+        dealer_x = 50
+        dealer_y = 80
+        target_pos = (dealer_x + card_index * (CARD_WIDTH + CARD_GAP), dealer_y)
+        img = self.card_images.get((card.rank, card.suit), None)
+        if img:
+            sprite = CardSprite(img, self.deck_pos, target_pos, speed=15)
+            self.animated_cards.append(sprite)
+
     def start_round(self):
         # Deduct bet first
         if not self.bank.place_bet():
@@ -43,27 +65,38 @@ class Game:
         self.player.reset()
         self.dealer.reset()
 
-        # Deal initial cards
-        self.player.add_card(self.deck.draw())
-        self.dealer.add_card(self.deck.draw())
-        self.player.add_card(self.deck.draw())
-        self.dealer.add_card(self.deck.draw())
-
-        # Update state
+        # Disable deal button, enable actions
         self.state = 'playing'
         self.message = ''
         self.btn_deal.enabled = False
-
-        # Enable player actions
         self.btn_hit.enabled = True
         self.btn_stand.enabled = True
         self.btn_split.enabled = self.player.can_split()
-        self.btn_double.enabled = True   # ✅ make sure it's visible now
-
-        # Reset double tracking
+        self.btn_double.enabled = True
         self.player_doubled = [False for _ in self.player.hands]
 
-        # Check for Blackjack
+        # Deal cards in order: player, dealer, player, dealer
+        deal_order = [
+            ('player', 0), 
+            ('dealer', 0), 
+            ('player', 0), 
+            ('dealer', 0)
+        ]
+
+        for target, hand_index in deal_order:
+            card = self.deck.draw()
+            if target == 'player':
+                # Logic: add to player's hand
+                self.player.hands[hand_index].add(card)
+                # Animation: slide from deck to hand
+                self.animate_card_to_player(card, hand_index, len(self.player.hands[hand_index].cards)-1)
+            else:
+                # Logic: add to dealer's hand
+                self.dealer.hands[hand_index].add(card)
+                # Animation: slide from deck to dealer
+                self.animate_card_to_dealer(card, len(self.dealer.hands[hand_index].cards)-1)
+
+        # Check for Blackjack immediately
         player_blackjack = self.player.hands[0].is_blackjack()
         dealer_blackjack = self.dealer.hands[0].is_blackjack()
 
@@ -82,7 +115,7 @@ class Game:
             self.btn_hit.enabled = False
             self.btn_stand.enabled = False
             self.btn_split.enabled = False
-            self.btn_double.enabled = False  # ✅ only disable here (not always)
+            self.btn_double.enabled = False
 
 
     def player_hit(self):
@@ -303,6 +336,12 @@ class Game:
         # Title
         title = self.big_font.render("Casino Clássico - Blackjack", True, (255, 255, 255))
         surf.blit(title, (self.base_width // 2 - title.get_width() // 2, 10))
+
+        for sprite in self.animated_cards[:]:
+            sprite.update()
+            sprite.draw(surf)
+            if sprite.done:
+                self.animated_cards.remove(sprite)
 
         # Draw dealer
         dealer_x = 50
