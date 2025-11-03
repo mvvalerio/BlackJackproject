@@ -83,11 +83,11 @@ class Bank:
                     new_bet = int(self.input_text)
                     if self.min_bet <= new_bet <= self.max_bet:
                         self.bet = new_bet
-                        print(f"Bet set to ${self.bet}")
+                        print(f"✅ Bet set to ${self.bet}")
                     else:
-                        print(f"Invalid bet (must be ${self.min_bet}–${self.max_bet})")
+                        print(f"❌ Invalid bet (must be ${self.min_bet}–${self.max_bet})")
                 except ValueError:
-                    print("Invalid input: must be a number")
+                    print("❌ Invalid input: must be a number")
 
                 # Reset input after pressing Enter
                 self.input_text = ""
