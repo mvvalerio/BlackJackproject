@@ -174,12 +174,21 @@ class Game:
 
     def player_split(self):
         if self.player.split():
-            # adiciona uma carta para cada mão
+            # add one card to each new split hand
             self.player.hands[0].add(self.deck.draw())
             self.player.hands[1].add(self.deck.draw())
+
+            # FIX ⬇ ensure doubled-tracking matches number of hands
+            self.player_doubled = [False] * len(self.player.hands)
+
             self.message = 'Split done: playing first hand'
+
+            # allow split again only if the new first hand also qualifies
             self.btn_split.enabled = self.player.can_split()
-            # continua jogando na primeira mão
+
+            # allow doubling the first split hand
+            self.btn_double.enabled = True
+
         else:
             self.message = 'Cannot split these cards.'
 
