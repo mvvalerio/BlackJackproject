@@ -71,7 +71,7 @@ class Game:
         self.btn_deal.enabled = False
         self.btn_hit.enabled = True
         self.btn_stand.enabled = True
-        self.btn_split.enabled = self.player.can_split()
+        self.btn_split.enabled = False  # temporary disable until cards dealt
         self.btn_double.enabled = True
         self.player_doubled = [False for _ in self.player.hands]
 
@@ -116,6 +116,19 @@ class Game:
             self.btn_stand.enabled = False
             self.btn_split.enabled = False
             self.btn_double.enabled = False
+
+            if self.state == 'playing':
+            # Now the player has both cards in hand; allow split if ranks match
+                self.btn_split.enabled = self.player.can_split()
+
+            # Debug: show what ranks we actually have (remove or comment out after verifying)
+            ranks = [(getattr(c, 'rank', None), getattr(c, 'suit', None)) for c in self.player.hands[0].cards]
+            print("DEBUG player cards (rank,suit):", ranks)
+            # Show as message briefly so you can see on-screen
+            self.message = f"DEBUG ranks: {ranks}"
+            # Now enable split if applicable
+            if self.state == 'playing':
+                self.btn_split.enabled = self.player.can_split()
 
 
     def player_hit(self):
@@ -415,6 +428,20 @@ class Game:
             scale = 1
             pos_x = pos_y = 0
             mouse_pos = (mx, my)
+
+        try:
+            # defensive checks in case objects are in intermediate state
+            can_split_now = (
+                self.state == 'playing' and
+                len(self.player.hands) == 1 and
+                len(self.player.hands[0].cards) == 2 and
+                self.player.can_split()
+            )
+        except Exception:
+            can_split_now = False
+
+        self.btn_split.enabled = can_split_now
+
 
         # Draw buttons on base surface
         self.btn_deal.draw(surf, mouse_pos)
