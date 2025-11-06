@@ -12,15 +12,52 @@ class Player:
     def add_card(self, card):
         self.hands[self.current_hand].add(card)
 
+    def _rank_key(self, card):
+        """
+        Return a normalized rank key for comparison:
+         - Aces => 'A'
+         - Face cards (J, Q, K, 'jack', 'queen', 'king') => '10'
+         - Numeric ranks => their string numeric value '2'..'10'
+         - If rank is stored as int, convert to str
+        """
+        r = getattr(card, 'rank', None)
+        if r is None:
+            return None
+        # ints -> string
+        if isinstance(r, int):
+            return str(r)
+        rs = str(r).lower()
+        if rs in ('a', 'ace'):
+            return 'A'
+        if rs in ('j', 'q', 'k', 'jack', 'queen', 'king'):
+            return '10'
+        # Accept 't' or '10'
+        if rs in ('t', '10', 'ten'):
+            return '10'
+        # fallback: return raw lower string
+        return rs
+
     def can_split(self):
-        if len(self.hands) > 1:
-            return False  # só permite split uma vez (pode adaptar depois)
+        # Only allow split if exactly one hand and that hand has 2 cards
+        if len(self.hands) != 1:
+            return False
+
         hand = self.hands[0]
+
+        # Must have exactly two cards
         if len(hand.cards) != 2:
             return False
+
         c1, c2 = hand.cards[0], hand.cards[1]
-        # split se cartas forem exatamente iguais (rank e suit)
-        return c1.rank == c2.rank
+        k1 = self._rank_key(c1)
+        k2 = self._rank_key(c2)
+
+        # Defensive: if rank parsing failed, disallow split
+        if k1 is None or k2 is None:
+            return False
+
+        # Compare normalized rank keys
+        return k1 == k2
 
     def split(self):
         hand = self.hands[0]
