@@ -44,20 +44,13 @@ class Player:
 
         hand = self.hands[0]
 
-        # Must have exactly two cards
         if len(hand.cards) != 2:
             return False
 
         c1, c2 = hand.cards[0], hand.cards[1]
-        k1 = self._rank_key(c1)
-        k2 = self._rank_key(c2)
 
-        # Defensive: if rank parsing failed, disallow split
-        if k1 is None or k2 is None:
-            return False
-
-        # Compare normalized rank keys
-        return k1 == k2
+        # STRICT: ranks must be EXACTLY equal ("10" == "10", "Q" != "10")
+        return c1.rank == c2.rank
 
     def split(self):
         hand = self.hands[0]
