@@ -12,7 +12,7 @@ class Game:
         self.base_height = SCREEN_HEIGHT
         self.base_surface = pygame.Surface((self.base_width, self.base_height))
         self.deck_pos = (self.base_width // 2 - CARD_WIDTH // 2, 50)
-        self.card_images = self.load_card_images("imgs")
+        self.card_images = self.load_card_images("png-cards")
         self.screen = screen
         self.deck = Deck(num_decks=4)
         self.player = Player()
@@ -22,6 +22,7 @@ class Game:
         self.state = 'idle'
         self.message = 'Click DEAL to start'
         self.animated_cards = []  # store CardSprite instances
+        self.dinheiro_sprite = None
         self.deck_pos = (self.base_width // 2 - CARD_WIDTH // 2, 50)  # center deck position
 
         self.fullscreen = False
@@ -37,6 +38,10 @@ class Game:
 
         # Bank
         self.bank = Bank(initial_amount=1000, font=self.font)
+        self.dealer_img = pygame.image.load(os.path.join(os.path.dirname(__file__), "persona", "alex.png")).convert_alpha()
+        self.dealer_img = pygame.transform.scale(self.dealer_img, (100, 100))
+        self.player_img = pygame.image.load(os.path.join(os.path.dirname(__file__), "persona", "marim.png")).convert_alpha()
+        self.player_img = pygame.transform.scale(self.player_img, (100, 150))
 
     def animate_card_to_player(self, card, hand_index, card_index):
         hand_x = 50 + hand_index * (CARD_WIDTH + CARD_GAP) * 5
@@ -64,36 +69,34 @@ class Game:
 
         self.player.reset()
         self.dealer.reset()
+        self.player.current_hand = 0
 
-        # Disable deal button, enable actions
+        # UI button state
         self.state = 'playing'
         self.message = ''
         self.btn_deal.enabled = False
         self.btn_hit.enabled = True
         self.btn_stand.enabled = True
-        self.btn_split.enabled = False  # temporary disable until cards dealt
+        self.btn_split.enabled = False   # disabled until cards are dealt
         self.btn_double.enabled = True
+
         self.player_doubled = [False for _ in self.player.hands]
 
         # Deal cards in order: player, dealer, player, dealer
         deal_order = [
-            ('player', 0), 
-            ('dealer', 0), 
-            ('player', 0), 
+            ('player', 0),
+            ('dealer', 0),
+            ('player', 0),
             ('dealer', 0)
         ]
 
         for target, hand_index in deal_order:
             card = self.deck.draw()
             if target == 'player':
-                # Logic: add to player's hand
                 self.player.hands[hand_index].add(card)
-                # Animation: slide from deck to hand
                 self.animate_card_to_player(card, hand_index, len(self.player.hands[hand_index].cards)-1)
             else:
-                # Logic: add to dealer's hand
                 self.dealer.hands[hand_index].add(card)
-                # Animation: slide from deck to dealer
                 self.animate_card_to_dealer(card, len(self.dealer.hands[hand_index].cards)-1)
 
         # Check for Blackjack immediately
@@ -116,20 +119,14 @@ class Game:
             self.btn_stand.enabled = False
             self.btn_split.enabled = False
             self.btn_double.enabled = False
+            return   # ⬅ IMPORTANT: stops execution so split doesn't get enabled later
 
-            if self.state == 'playing':
-            # Now the player has both cards in hand; allow split if ranks match
-                self.btn_split.enabled = self.player.can_split()
+        # Enable SPLIT only if the hand can be split and player has money for second bet
+        can_split = self.player.can_split() and self.bank.amount >= self.bank.bet
+        self.btn_split.enabled = can_split
 
-            # Debug: show what ranks we actually have (remove or comment out after verifying)
-            ranks = [(getattr(c, 'rank', None), getattr(c, 'suit', None)) for c in self.player.hands[0].cards]
-            print("DEBUG player cards (rank,suit):", ranks)
-            # Show as message briefly so you can see on-screen
-            self.message = f"DEBUG ranks: {ranks}"
-            # Now enable split if applicable
-            if self.state == 'playing':
-                self.btn_split.enabled = self.player.can_split()
-
+        # Double is only allowed if two cards
+        self.btn_double.enabled = len(self.player.hands[self.player.current_hand].cards) == 2
 
     def player_hit(self):
         if self.state != 'playing':
@@ -173,22 +170,31 @@ class Game:
 
 
     def player_split(self):
+        # check money before doing split
+        if not self.player.can_split():
+            self.message = 'Cannot split these cards.'
+            return
+
+        # require enough money for another bet
+        if self.bank.amount < self.bank.bet:
+            self.message = 'Not enough money to split!'
+            return
+
+        # Deduct the second-hand bet
+        self.bank.place_bet()
+
         if self.player.split():
-            # add one card to each new split hand
+            # draw one card for each split hand
             self.player.hands[0].add(self.deck.draw())
             self.player.hands[1].add(self.deck.draw())
 
-            # FIX ⬇ ensure doubled-tracking matches number of hands
             self.player_doubled = [False] * len(self.player.hands)
 
             self.message = 'Split done: playing first hand'
 
-            # allow split again only if the new first hand also qualifies
+            # allow/disable split/double buttons as needed
             self.btn_split.enabled = self.player.can_split()
-
-            # allow doubling the first split hand
             self.btn_double.enabled = True
-
         else:
             self.message = 'Cannot split these cards.'
 
@@ -300,6 +306,10 @@ class Game:
         # Junta mensagens em linhas
         return " | ".join(results)
 
+    def animate_dinheiro(self, start_pos, target_pos, speed=8):
+        self.dinheiro_sprite = CardSprite(self.img_dinheiro, start_pos, target_pos, speed)
+
+
     def load_card_images(self, folder):
         images = {}
         # Supondo que a pasta tem arquivos no formato "ace_of_spades.png", etc
@@ -357,7 +367,13 @@ class Game:
 
         # Title
         title = self.big_font.render("Casino Clássico - Blackjack", True, (255, 255, 255))
-        surf.blit(title, (self.base_width // 2 - title.get_width() // 2, 10))
+        surf.blit(title, (self.base_width // 2 - title.get_width() // 3, 10))
+
+        if self.dinheiro_sprite:
+            self.dinheiro_sprite.update()
+            self.dinheiro_sprite.draw(surf)
+            if self.dinheiro_sprite.done:
+                self.dinheiro_sprite = None
 
         for sprite in self.animated_cards[:]:
             sprite.update()
@@ -368,6 +384,7 @@ class Game:
         # Draw dealer
         dealer_x = 50
         dealer_y = 80
+        surf.blit(self.dealer_img, (dealer_x + 190, dealer_y - 100))
         surf.blit(self.font.render("Dealer", True, (255, 255, 255)), (dealer_x, dealer_y - 30))
         dealer_hand = self.dealer.hands[0]
         for i, card in enumerate(dealer_hand.cards):
@@ -395,6 +412,7 @@ class Game:
         base_y = self.base_height - CARD_HEIGHT - 120
         for idx, hand in enumerate(self.player.hands):
             hand_x = 50 + idx * (CARD_WIDTH + CARD_GAP) * 5
+            surf.blit(self.player_img, (hand_x + 165, base_y - 150))
             label = "Player" + (f" (Hand {idx+1})" if len(self.player.hands) > 1 else "")
             surf.blit(self.font.render(label, True, (255, 255, 255)), (hand_x, base_y - 30))
 
@@ -437,20 +455,6 @@ class Game:
             scale = 1
             pos_x = pos_y = 0
             mouse_pos = (mx, my)
-
-        try:
-            # defensive checks in case objects are in intermediate state
-            can_split_now = (
-                self.state == 'playing' and
-                len(self.player.hands) == 1 and
-                len(self.player.hands[0].cards) == 2 and
-                self.player.can_split()
-            )
-        except Exception:
-            can_split_now = False
-
-        self.btn_split.enabled = can_split_now
-
 
         # Draw buttons on base surface
         self.btn_deal.draw(surf, mouse_pos)

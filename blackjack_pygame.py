@@ -1,12 +1,11 @@
 import pygame
 import random
-import json
 import sys
 import os
 
 # --------- Constantes ---------
-SCREEN_WIDTH = 1000
-SCREEN_HEIGHT = 700
+SCREEN_WIDTH = 900
+SCREEN_HEIGHT = 600
 FPS = 30
 CARD_WIDTH = 80
 CARD_HEIGHT = 120
@@ -126,104 +125,6 @@ class Dealer(Player):
         best = self.hands[0].best_value()
         return best < 17
 
-
-class Bank:
-    def __init__(self, initial_amount=1000, font=None, save_file="bank.json"):
-        self.save_file = save_file
-        self.amount = initial_amount
-        self.bet = 10
-        self.min_bet = 1
-        self.max_bet = self.amount  # max bet starts equal to bank
-        self.slider_rect = pygame.Rect(0, 0, 200, 10)
-        self.slider_handle_rect = pygame.Rect(0, 0, 20, 20)
-        self.dragging = False
-        self.font = font or pygame.font.SysFont("serif", 20, bold=True)
-
-        # Load saved data (if available)
-        self.load_from_json()
-
-    def save_to_json(self):
-        """Automatically saves the current bank data to a JSON file."""
-        data = {
-            "amount": self.amount,
-            "bet": self.bet,
-            "min_bet": self.min_bet
-        }
-        with open(self.save_file, "w") as f:
-            json.dump(data, f, indent=4)
-
-    def load_from_json(self):
-        """Loads bank data from JSON file if it exists."""
-        if os.path.exists(self.save_file):
-            try:
-                with open(self.save_file, "r") as f:
-                    data = json.load(f)
-                    self.amount = data.get("amount", self.amount)
-                    self.bet = data.get("bet", self.bet)
-                    self.min_bet = data.get("min_bet", self.min_bet)
-                    self.max_bet = self.amount
-            except json.JSONDecodeError:
-                print("Warning: bank.json is corrupted. Using default values.")
-
-    def draw(self, screen, position):
-        # Always keep max_bet synced with current bank amount
-        self.max_bet = max(self.min_bet, self.amount)
-
-        x, y = position
-        # Display bank amount
-        amt_text = self.font.render(f"Bank: ${self.amount}", True, (255, 255, 255))
-        screen.blit(amt_text, (x, y))
-
-        # Slider position
-        self.slider_rect.topleft = (x, y + 30)
-        pygame.draw.rect(screen, (180, 180, 180), self.slider_rect)
-
-        # Clamp bet to current max_bet if needed
-        self.bet = min(self.bet, self.max_bet)
-
-        # Handle position based on bet
-        handle_x = x + int(
-            (self.bet - self.min_bet)
-            / (self.max_bet - self.min_bet)
-            * (self.slider_rect.width - self.slider_handle_rect.width)
-        ) if self.max_bet > self.min_bet else x
-        handle_y = y + 25
-        self.slider_handle_rect.topleft = (handle_x, handle_y)
-        pygame.draw.rect(screen, (255, 255, 0), self.slider_handle_rect)
-
-        # Display current bet
-        bet_text = self.font.render(f"Bet: ${self.bet}", True, (255, 255, 255))
-        screen.blit(bet_text, (x, y + 60))
-
-    def handle_event(self, event):
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if self.slider_handle_rect.collidepoint(event.pos):
-                self.dragging = True
-        elif event.type == pygame.MOUSEBUTTONUP:
-            self.dragging = False
-        elif event.type == pygame.MOUSEMOTION:
-            if self.dragging:
-                self.max_bet = max(self.min_bet, self.amount)
-                rel_x = event.pos[0] - self.slider_rect.x
-                rel_x = max(0, min(rel_x, self.slider_rect.width - self.slider_handle_rect.width))
-                self.bet = self.min_bet + int(
-                    rel_x / (self.slider_rect.width - self.slider_handle_rect.width)
-                    * (self.max_bet - self.min_bet)
-                )
-
-    def place_bet(self):
-        """Subtracts the current bet from the bank and auto-saves."""
-        if self.bet > self.amount:
-            return False  # cannot bet more than available
-        self.amount -= self.bet
-        self.save_to_json()  # auto-save after betting
-        return True
-
-    def payout(self, multiplier=2):
-        """Adds winnings to the bank and auto-saves."""
-        self.amount += int(self.bet * multiplier)
-        self.save_to_json()  # auto-save after payout
-
 class Button:
     def __init__(self, rect, text, font):
         self.rect = pygame.Rect(rect)
@@ -246,18 +147,17 @@ class Button:
 
 class Game:
     def __init__(self, screen):
-        self.card_images = self.load_card_images("imgs")
+        self.card_images = self.load_card_images("png-cards")
         self.screen = screen
         self.deck = Deck(num_decks=4)
         self.player = Player()
         self.dealer = Dealer()
         self.font = pygame.font.SysFont("serif", 22, bold=True)
         self.big_font = pygame.font.SysFont("serif", 36, bold=True)
-        self.state = 'idle'
+        self.state = 'idle'  # idle, playing, player_stand, round_over
         self.message = 'Click DEAL to start'
 
         self.fullscreen = False
-        self.player_doubled = [False for _ in self.player.hands]
         self.base_width = SCREEN_WIDTH
         self.base_height = SCREEN_HEIGHT
         self.base_surface = pygame.Surface((self.base_width, self.base_height))
@@ -267,62 +167,35 @@ class Game:
         self.btn_hit = Button((140, self.base_height - 60, 100, 40), 'HIT', self.font)
         self.btn_stand = Button((260, self.base_height - 60, 100, 40), 'STAND', self.font)
         self.btn_split = Button((380, self.base_height - 60, 100, 40), 'SPLIT', self.font)
-        self.btn_double = Button((500, self.base_height - 60, 120, 40), 'DOUBLE', self.font)
         self.btn_quit = Button((self.base_width - 120, self.base_height - 60, 100, 40), 'QUIT', self.font)
 
-        # Bank
-        self.bank = Bank(initial_amount=1000, font=self.font)
-
     def start_round(self):
-        # Deduct bet first
-        if not self.bank.place_bet():
-            self.message = "Not enough money to bet!"
-            return
-
         self.player.reset()
         self.dealer.reset()
-
-        # Deal initial cards
+        # mão inicial de 2 cartas
         self.player.add_card(self.deck.draw())
         self.dealer.add_card(self.deck.draw())
         self.player.add_card(self.deck.draw())
         self.dealer.add_card(self.deck.draw())
-
-        # Update state
         self.state = 'playing'
         self.message = ''
+        # Desabilita botão DEAL enquanto jogar
         self.btn_deal.enabled = False
-
-        # Enable player actions
+        self.btn_split.enabled = self.player.can_split()
         self.btn_hit.enabled = True
         self.btn_stand.enabled = True
-        self.btn_split.enabled = self.player.can_split()
-        self.btn_double.enabled = True   # ✅ make sure it's visible now
 
-        # Reset double tracking
-        self.player_doubled = [False for _ in self.player.hands]
-
-        # Check for Blackjack
-        player_blackjack = self.player.hands[0].is_blackjack()
-        dealer_blackjack = self.dealer.hands[0].is_blackjack()
-
-        if player_blackjack or dealer_blackjack:
-            if player_blackjack and dealer_blackjack:
+        # verifica Blackjack
+        if self.player.hands[0].is_blackjack():
+            if self.dealer.hands[0].is_blackjack():
                 self.message = 'Push: both have Blackjack'
-            elif player_blackjack:
-                self.message = 'Blackjack! You win!'
-                self.bank.payout(2.5)
             else:
-                self.message = 'Dealer has Blackjack! You lose.'
-
-            # End round immediately if Blackjack occurs
+                self.message = 'Blackjack! You win!'
             self.state = 'round_over'
             self.btn_deal.enabled = True
             self.btn_hit.enabled = False
             self.btn_stand.enabled = False
             self.btn_split.enabled = False
-            self.btn_double.enabled = False  # ✅ only disable here (not always)
-
 
     def player_hit(self):
         if self.state != 'playing':
@@ -376,59 +249,6 @@ class Game:
         else:
             self.message = 'Cannot split these cards.'
 
-    def player_double(self):
-        if self.state != 'playing':
-            return
-
-        hand_index = self.player.current_hand
-        hand = self.player.hands[hand_index]
-
-        # Only allow double once per hand
-        if self.player_doubled[hand_index]:
-            self.message = "You already doubled this hand!"
-            return
-
-        # Only allowed with exactly two cards
-        if len(hand.cards) != 2:
-            self.message = "You can only double on your first two cards!"
-            return
-
-        # Check for enough money
-        if self.bank.bet > self.bank.amount:
-            self.message = "Not enough money to double!"
-            return
-
-        # Deduct additional bet
-        self.bank.place_bet()
-        self.bank.bet *= 2
-        self.player_doubled[hand_index] = True
-
-        # Add one card
-        hand.add(self.deck.draw())
-
-        # Move to next hand or dealer
-        if hand.is_bust():
-            self.message = f"Hand {hand_index + 1} busted after double!"
-        else:
-            self.message = f"Hand {hand_index + 1} doubled down."
-
-        # If more hands remain, move to the next one
-        if hand_index + 1 < len(self.player.hands):
-            self.player.current_hand += 1
-            self.message += f" Playing hand {self.player.current_hand + 1}."
-            self.btn_split.enabled = False
-            self.btn_double.enabled = True
-            self.btn_hit.enabled = True
-            self.btn_stand.enabled = True
-        else:
-            # All hands done, dealer plays
-            self.btn_hit.enabled = False
-            self.btn_stand.enabled = False
-            self.btn_split.enabled = False
-            self.btn_double.enabled = False
-            self.state = 'player_stand'
-            self.dealer_play()
-
     def dealer_play(self):
         while not self.dealer.hands[0].is_bust() and self.dealer.should_hit():
             self.dealer.hands[0].add(self.deck.draw())
@@ -440,20 +260,7 @@ class Game:
         self.btn_hit.enabled = False
         self.btn_stand.enabled = False
         self.btn_split.enabled = False
-        result = self.determine_winner()
-
-        # Handle payouts
-        for i, hand in enumerate(self.player.hands):
-            p_best = hand.best_value()
-            d_best = self.dealer.hands[0].best_value()
-            if hand.is_bust():
-                continue
-            elif self.dealer.hands[0].is_bust() or p_best > d_best:
-                self.bank.payout(2)
-            elif hand.is_blackjack() and not self.dealer.hands[0].is_blackjack():
-                self.bank.payout(2.5)
-
-        self.message = result
+        self.message = self.determine_winner()
 
     def determine_winner(self):
         results = []
@@ -531,32 +338,32 @@ class Game:
             self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 
     def render(self):
-        surf = self.base_surface
-        surf.fill(TABLE_COLOR)
+        surf = self.base_surface  # desenhamos na superfície fixa 900x600
 
-        # Draw table pattern
+        # Fundo mesa
+        surf.fill(TABLE_COLOR)
         for y in range(0, self.base_height, 20):
             for x in range(0, self.base_width, 20):
                 pygame.draw.circle(surf, (20, 120, 50), (x+10, y+10), 2)
 
-        # Title
+        # Título
         title = self.big_font.render("Casino Clássico - Blackjack", True, (255, 255, 255))
         surf.blit(title, (self.base_width // 2 - title.get_width() // 2, 10))
 
-        # Draw dealer
+        # Desenha dealer
         dealer_x = 50
         dealer_y = 80
-        surf.blit(self.font.render("Dealer", True, (255, 255, 255)), (dealer_x, dealer_y - 30))
-        dealer_hand = self.dealer.hands[0]
-        for i, card in enumerate(dealer_hand.cards):
+        surf.blit(self.font.render("Dealer", True, (255,255,255)), (dealer_x, dealer_y - 30))
+        for i, card in enumerate(self.dealer.hands[0].cards):
             pos = (dealer_x + i*(CARD_WIDTH+CARD_GAP), dealer_y)
             if self.state == 'playing' and i == 0:
                 self.draw_back_card(surf, pos)
             else:
                 self.draw_card(surf, card, pos)
-
-        # Dealer value
+        
+        dealer_hand = self.dealer.hands[0]
         if self.state == 'playing':
+            # Oculta primeira carta enquanto rodada está em andamento
             visible_cards = dealer_hand.cards[1:]
             temp_hand = Hand()
             for c in visible_cards:
@@ -564,123 +371,101 @@ class Game:
             val = temp_hand.best_value() if visible_cards else 0
             val_text = f"Value: {val if val > 0 else '?'}"
         else:
+            # Mostra valor total ao final
             val = dealer_hand.best_value()
             val_text = f"Value: {val}" if not dealer_hand.is_bust() else "Bust!"
-        color = (255, 0, 0) if dealer_hand.is_bust() else (255, 255, 255)
+        
+        color = (255,0,0) if dealer_hand.is_bust() else (255,255,255)
         surf.blit(self.font.render(val_text, True, color), (dealer_x, dealer_y + CARD_HEIGHT + 5))
 
-        # Draw player hands
+        # Desenha jogador (uma ou duas mãos)
         base_y = self.base_height - CARD_HEIGHT - 120
         for idx, hand in enumerate(self.player.hands):
             hand_x = 50 + idx * (CARD_WIDTH + CARD_GAP) * 5
             label = "Player" + (f" (Hand {idx+1})" if len(self.player.hands) > 1 else "")
-            surf.blit(self.font.render(label, True, (255, 255, 255)), (hand_x, base_y - 30))
+            surf.blit(self.font.render(label, True, (255,255,255)), (hand_x, base_y - 30))
 
             for i, card in enumerate(hand.cards):
                 pos = (hand_x + i*(CARD_WIDTH + CARD_GAP), base_y)
                 self.draw_card(surf, card, pos)
 
+            # Valor da mão
             val = hand.best_value()
             val_text = f"Value: {val}" if not hand.is_bust() else "Bust!"
-            color = (255, 0, 0) if hand.is_bust() else (255, 255, 255)
+            color = (255,0,0) if hand.is_bust() else (255,255,255)
             surf.blit(self.font.render(val_text, True, color), (hand_x, base_y + CARD_HEIGHT + 5))
 
-            # Highlight current hand
-            if len(self.player.hands) > 1 and idx == self.player.current_hand:
-                pygame.draw.rect(surf, (255, 255, 255),
-                                (hand_x - 5, base_y - 5, (CARD_WIDTH + CARD_GAP) * len(hand.cards), CARD_HEIGHT + 10), 3)
+            # Destacar a mão atual
+            if idx == self.player.current_hand:
+                pygame.draw.rect(surf, (255, 255, 0), (hand_x - 5, base_y - 5, (CARD_WIDTH + CARD_GAP)*len(hand.cards), CARD_HEIGHT + 10), 3)
 
-        # Message
+        # Mensagem centralizada
         msg_surf = self.font.render(self.message, True, (255, 255, 0))
-        surf.blit(msg_surf, (self.base_width // 2 - msg_surf.get_width() // 2, self.base_height - 370))
+        surf.blit(msg_surf, (self.base_width // 2 - msg_surf.get_width() // 2, self.base_height - 90))
 
-        # Draw Bank
-        self.bank.draw(surf, (self.base_width - 220, 70))
-
-        # Determine scaled mouse position
-        mx, my = pygame.mouse.get_pos()
+        # ESCALONAR para tela real
         if self.fullscreen:
             screen_w, screen_h = self.screen.get_size()
+
             scale_w = screen_w / self.base_width
             scale_h = screen_h / self.base_height
             scale = min(scale_w, scale_h)
 
             new_w = int(self.base_width * scale)
             new_h = int(self.base_height * scale)
+
+            scaled_surface = pygame.transform.smoothscale(self.base_surface, (new_w, new_h))
+
             pos_x = (screen_w - new_w) // 2
             pos_y = (screen_h - new_h) // 2
 
-            mouse_pos = ((mx - pos_x) / scale, (my - pos_y) / scale)
-        else:
-            scale = 1
-            pos_x = pos_y = 0
-            mouse_pos = (mx, my)
-
-        # Draw buttons on base surface
-        self.btn_deal.draw(surf, mouse_pos)
-        self.btn_hit.draw(surf, mouse_pos)
-        self.btn_stand.draw(surf, mouse_pos)
-        self.btn_split.draw(surf, mouse_pos)
-        self.btn_double.draw(surf, mouse_pos)
-        self.btn_quit.draw(surf, mouse_pos)
-
-        # Blit scaled surface to screen
-        if self.fullscreen:
-            scaled_surface = pygame.transform.smoothscale(self.base_surface, (new_w, new_h))
-            self.screen.fill((0, 0, 0))  # black bars
+            self.screen.fill((0, 0, 0))  # barras pretas
             self.screen.blit(scaled_surface, (pos_x, pos_y))
         else:
             self.screen.blit(self.base_surface, (0, 0))
+            pos_x = 0
+            pos_y = 0
+            scale = 1
+
+        # Ajusta mouse_pos para os botões no fullscreen
+        real_mouse_pos = pygame.mouse.get_pos()
+        if self.fullscreen:
+            mx, my = real_mouse_pos
+            mx = int((mx - pos_x) / scale)
+            my = int((my - pos_y) / scale)
+            mouse_pos = (mx, my)
+        else:
+            mouse_pos = real_mouse_pos
+
+        # Botões desenhados na tela real, mas posição fixa, ok
+        self.btn_deal.draw(self.screen, mouse_pos)
+        self.btn_hit.draw(self.screen, mouse_pos)
+        self.btn_stand.draw(self.screen, mouse_pos)
+        self.btn_split.draw(self.screen, mouse_pos)
+        self.btn_quit.draw(self.screen, mouse_pos)
 
         pygame.display.flip()
-
 
     def handle_events(self, events):
         for event in events:
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
-
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_F11:
+                if event.key == pygame.K_f:
                     self.toggle_fullscreen()
-
-            elif event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP, pygame.MOUSEMOTION):
-                # Scale mouse coordinates for fullscreen
-                mx, my = event.pos
-                if self.fullscreen:
-                    screen_w, screen_h = self.screen.get_size()
-                    scale_w = screen_w / self.base_width
-                    scale_h = screen_h / self.base_height
-                    scale = min(scale_w, scale_h)
-                    new_w = int(self.base_width * scale)
-                    new_h = int(self.base_height * scale)
-                    pos_x = (screen_w - new_w) // 2
-                    pos_y = (screen_h - new_h) // 2
-                    scaled_mouse = ((mx - pos_x) / scale, (my - pos_y) / scale)
-                else:
-                    scaled_mouse = (mx, my)
-
-                # Pass event with scaled position to Bank
-                temp_event = pygame.event.Event(event.type, {**event.dict, "pos": scaled_mouse})
-                self.bank.handle_event(temp_event)
-
-                # Only handle clicks on MOUSEBUTTONDOWN
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    if self.btn_deal.clicked(temp_event):
-                        self.start_round()
-                    elif self.btn_hit.clicked(temp_event):
-                        self.player_hit()
-                    elif self.btn_stand.clicked(temp_event):
-                        self.player_stand()
-                    elif self.btn_split.clicked(temp_event):
-                        self.player_split()
-                    elif self.btn_double.clicked(temp_event):
-                        self.player_double()
-                    elif self.btn_quit.clicked(temp_event):
-                        pygame.quit()
-                        sys.exit()
-
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if self.btn_deal.clicked(event):
+                    self.start_round()
+                elif self.btn_hit.clicked(event):
+                    self.player_hit()
+                elif self.btn_stand.clicked(event):
+                    self.player_stand()
+                elif self.btn_split.clicked(event):
+                    self.player_split()
+                elif self.btn_quit.clicked(event):
+                    pygame.quit()
+                    sys.exit()
 
 def main():
     pygame.init()

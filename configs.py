@@ -4,9 +4,9 @@ import sys
 import os
 
 # --------- Constantes ---------
-SCREEN_WIDTH = 900
-SCREEN_HEIGHT = 600
-FPS = 30
+SCREEN_WIDTH = 1280
+SCREEN_HEIGHT = 720
+FPS = 80
 CARD_WIDTH = 80
 CARD_HEIGHT = 120
 CARD_GAP = 20

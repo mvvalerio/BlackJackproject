@@ -49,8 +49,17 @@ class Player:
 
         c1, c2 = hand.cards[0], hand.cards[1]
 
-        # STRICT: ranks must be EXACTLY equal ("10" == "10", "Q" != "10")
-        return c1.rank == c2.rank
+        # Normalize ranks (use _rank_key to allow 'J','Q','K','10' equivalence if desired)
+        k1 = self._rank_key(c1)
+        k2 = self._rank_key(c2)
+
+        if k1 is None or k2 is None:
+            return False
+
+        # If you want strict "same rank" behaviour (Q vs '10' not allowed), use:
+        # return k1 == k2
+        # If you want to treat all 10-value cards as equivalent, map '10' and face cards to same key:
+        return k1 == k2
 
     def split(self):
         hand = self.hands[0]
