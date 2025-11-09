@@ -5,6 +5,7 @@ from player import Player, Dealer
 from botao import Button
 from bank import Bank
 from cardSprite import CardSprite
+import os
 
 class Game:
     def __init__(self, screen):
@@ -42,6 +43,24 @@ class Game:
         self.dealer_img = pygame.transform.scale(self.dealer_img, (100, 100))
         self.player_img = pygame.image.load(os.path.join(os.path.dirname(__file__), "persona", "marim.png")).convert_alpha()
         self.player_img = pygame.transform.scale(self.player_img, (100, 150))
+         # Initialize sound mixer
+        pygame.mixer.init()
+
+        # Set volume levels (adjust these values between 0.0 and 1.0)
+        self.music_volume = 0.1  # Background music volume
+        self.sfx_volume = 0.5    # Sound effects volume
+
+        # Load background music (you can add the file later)
+        try:
+            pygame.mixer.music.load(os.path.join(os.path.dirname(__file__), "sounds", "background.mp3"))
+            pygame.mixer.music.set_volume(self.music_volume)
+            pygame.mixer.music.play(-1)  # Loop indefinitely
+        except pygame.error:
+            print("Background music file not found. Add 'sounds/background.mp3' to enable music.")
+
+        # Sound effect paths (add files later)
+        self.sound_win = os.path.join(os.path.dirname(__file__), "sounds", "win.mp3")
+        self.sound_lose = os.path.join(os.path.dirname(__file__), "sounds", "lose.mp3")
 
     def animate_card_to_player(self, card, hand_index, card_index):
         hand_x = 50 + hand_index * (CARD_WIDTH + CARD_GAP) * 5
@@ -263,6 +282,21 @@ class Game:
         self.btn_stand.enabled = False
         self.btn_split.enabled = False
         result = self.determine_winner()
+        # Play win/lose sound based on result
+        if "Player wins" in result or "Dealer busted" in result:
+            try:
+                sound = pygame.mixer.Sound(self.sound_win)
+                sound.set_volume(self.sfx_volume)
+                sound.play()
+            except pygame.error:
+                pass  # Sound file not found, skip
+        elif "Dealer wins" in result or "Busted" in result:
+            try:
+                sound = pygame.mixer.Sound(self.sound_lose)
+                sound.set_volume(self.sfx_volume)
+                sound.play()
+            except pygame.error:
+                pass  # Sound file not found, skip
 
         # Handle payouts
         for i, hand in enumerate(self.player.hands):
@@ -274,6 +308,8 @@ class Game:
                 self.bank.payout(2)
             elif hand.is_blackjack() and not self.dealer.hands[0].is_blackjack():
                 self.bank.payout(2.5)
+            elif p_best == d_best:  # Push (tie)
+                self.bank.payout(1)  # Return bet
 
         self.message = result
 
