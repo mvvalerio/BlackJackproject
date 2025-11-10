@@ -1,5 +1,5 @@
 import pygame
-from configs import BUTTON_COLOR, BUTTON_HIGHLIGHT, CARD_BORDER, TEXT_COLOR
+from Configs import BUTTON_COLOR, BUTTON_HIGHLIGHT, CARD_BORDER, TEXT_COLOR
 
 class Button:
     def __init__(self, rect, text, font):

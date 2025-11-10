@@ -1,5 +1,5 @@
 import pygame, sys
-from configs import *
+from Configs import *
 from cartas import Deck, Hand
 from player import Player, Dealer
 from botao import Button

@@ -1,21 +1,15 @@
 import pygame
-<<<<<<< HEAD
 import os
 
 # --------- Diretorio de Imagens ---------
 
 BASE_DIR = os.path.dirname(__file__)
 IMG_DIR = os.path.join(BASE_DIR, "png-cards")
-=======
-import random
-import sys
-import os
->>>>>>> 72de899d5273040baa6d0fc6d3431c6e2a1d6d8c
 
 # --------- Constantes ---------
 SCREEN_WIDTH = 900
 SCREEN_HEIGHT = 600
-FPS = 30
+FPS = 80
 CARD_WIDTH = 80
 CARD_HEIGHT = 120
 CARD_GAP = 20

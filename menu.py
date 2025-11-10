@@ -1,7 +1,7 @@
 import pygame
 import sys
 import os
-from configs import SCREEN_WIDTH, SCREEN_HEIGHT, TABLE_COLOR, TEXT_COLOR
+from Configs import SCREEN_WIDTH, SCREEN_HEIGHT, TABLE_COLOR, TEXT_COLOR
 from botao import Button
 
 class Menu:

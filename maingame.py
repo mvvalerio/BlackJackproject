@@ -2,11 +2,11 @@ import pygame
 import sys
 import os
 from Configs import SCREEN_WIDTH, SCREEN_HEIGHT, FPS
-from Jogo import Game
+from jogo import Game
 
 # Add the parent directory to sys.path to import menu
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-from Menu import Menu
+from menu import Menu
 
 def main():
     pygame.init()

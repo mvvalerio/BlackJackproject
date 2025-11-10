@@ -1,5 +1,5 @@
 import random
-from configs import RANKS, SUITS, VALUES
+from Configs import RANKS, SUITS, VALUES
 
 class Card:
     def __init__(self, rank, suit):
