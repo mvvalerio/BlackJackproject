@@ -420,7 +420,7 @@ class Game:
         # Draw dealer
         dealer_x = 50
         dealer_y = 80
-        surf.blit(self.dealer_img, (dealer_x + 190, dealer_y - 100))
+        surf.blit(self.dealer_img, (dealer_x + 130, dealer_y - 100))
         surf.blit(self.font.render("Dealer", True, (255, 255, 255)), (dealer_x, dealer_y - 30))
         dealer_hand = self.dealer.hands[0]
         for i, card in enumerate(dealer_hand.cards):
