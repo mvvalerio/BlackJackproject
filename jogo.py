@@ -448,7 +448,7 @@ class Game:
         base_y = self.base_height - CARD_HEIGHT - 120
         for idx, hand in enumerate(self.player.hands):
             hand_x = 50 + idx * (CARD_WIDTH + CARD_GAP) * 5
-            surf.blit(self.player_img, (hand_x + 165, base_y - 150))
+            surf.blit(self.player_img, (hand_x + 130, base_y - 150))
             label = "Player" + (f" (Hand {idx+1})" if len(self.player.hands) > 1 else "")
             surf.blit(self.font.render(label, True, (255, 255, 255)), (hand_x, base_y - 30))
 
